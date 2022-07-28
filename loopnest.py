@@ -1,8 +1,64 @@
 import torch
 import torch.fx
 
-from functools import wraps
 from itertools import product
+import operator
+
+@torch.fx.wrap
+def program_id(axis):
+  pass
+
+@torch.fx.wrap
+def num_programs(axis):
+  pass
+
+@torch.fx.wrap
+def broadcast(input, other):
+  pass
+
+@torch.fx.wrap
+def broadcast_to(input, shape):
+  pass
+
+@torch.fx.wrap
+def load(ptr):
+  pass
+
+@torch.fx.wrap
+def store(ptr, val):
+  pass
+
+
+allowed_fns = {
+  program_id, num_programs, torch.arange, torch.zeros, broadcast, broadcast_to,
+  torch.cat, torch.reshape, torch.dot, load, store, torch.where, torch.div,
+  torch.floor_divide, torch.exp, torch.log, torch.cos, torch.sin, torch.sqrt,
+  torch.max, torch.argmax, torch.min, torch.argmin, torch.sum, torch.abs,
+  torch.minimum, torch.maximum, torch.sigmoid, torch.softmax, torch.ravel,
+  torch.zeros_like, operator.add, operator.sub, operator.mul, operator.truediv,
+  operator.floordiv
+}
+
+class TiledProgramTracer(torch.fx.Tracer):
+  def create_node(self, kind, target, args, kwargs, name=None, type_expr=None):
+
+    if kind == 'placeholder':
+      pass
+    elif kind == 'call_method':
+      pass
+    elif kind == 'call_module':
+      raise ValueError('Module calls not allowed in tiled program tracing!')
+    elif kind == 'call_function':
+      assert target in allowed_fns, \
+        f'{torch.typename(target)} not allowed in tiled programming model'
+    elif kind == 'get_attr':
+      raise ValueError('Attribute fetches not allowed in tiled program tracing!')
+    elif kind == 'output':
+      pass
+    else:
+      pass
+
+    return super().create_node(kind, target, args, kwargs, name, type_expr)
 
 class IterationSpaceCallable(torch.fx.GraphModule):
   def __init__(self, axes, root, graph, class_name = 'graph_module'):
@@ -28,7 +84,7 @@ class IterationSpaceCallable(torch.fx.GraphModule):
 def compile_loopnest(axes):
 
   def inner(func):
-    tracer = torch.fx.Tracer()
+    tracer = TiledProgramTracer()
     graph = tracer.trace(func)
     return IterationSpaceCallable(axes, tracer.root, graph)
 
@@ -46,4 +102,4 @@ x = torch.randn(3, 4)
 test_out = foobarbaz(x)
 ref_out = x * 2.0
 
-torch.testing.assert_allclose(test_out, ref_out)
+torch.testing.assert_close(test_out, ref_out)
