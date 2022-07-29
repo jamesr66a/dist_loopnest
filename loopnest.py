@@ -39,13 +39,15 @@ allowed_fns = {
   operator.floordiv
 }
 
+# TODO: limit types and have special proxies
 class TiledProgramTracer(torch.fx.Tracer):
   def create_node(self, kind, target, args, kwargs, name=None, type_expr=None):
 
     if kind == 'placeholder':
       pass
     elif kind == 'call_method':
-      pass
+      # TODO
+      raise ValueError('Method calles currently not allowed')
     elif kind == 'call_module':
       raise ValueError('Module calls not allowed in tiled program tracing!')
     elif kind == 'call_function':
@@ -72,8 +74,9 @@ class IterationSpaceCallable(torch.fx.GraphModule):
     assert all(arg.is_contiguous() for arg in args)
     assert all(len(self.axes) == arg.ndim for arg in args)
 
-    # TODO: multiple outputs
-    output = torch.empty(*self.axes)
+    # TODO: analyze outputs
+    # TODO: infer device
+    output = torch.empty(*self.axes, device='cuda')
     for idxs in product(*(range(axis) for axis in self.axes)):
       iter_args = [arg[idxs] for arg in args]
 
@@ -98,7 +101,7 @@ def foobarbaz(x):
 
 
 print(foobarbaz.graph)
-x = torch.randn(3, 4)
+x = torch.randn(3, 4, device='cuda')
 test_out = foobarbaz(x)
 ref_out = x * 2.0
 
